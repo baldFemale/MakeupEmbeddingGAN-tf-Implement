@@ -1,0 +1,285 @@
+import tensorflow as tf
+import numpy as np
+import os
+import random
+import time
+from scipy.misc import imsave
+from model import *
+
+batch_size = 1
+img_height = 256
+img_width = 256
+img_layer = 3
+pool_size = 50
+max_images = 1
+
+to_restore = False
+to_train = True
+to_test = False
+save_training_images = False
+out_path = "./output"
+check_dir = "./output/checkpoints/"
+
+
+class MakeupEmbeddingGAN():
+    def input_setup(self):
+        filename_A = tf.train.match_filenames_once("./Japanese_after_rotate/*.jpg")
+        self.queue_length_A = tf.size(filename_A)
+        filename_B = tf.train.match_filenames_once("./smokey_after_rotate/*.jpg")
+        self.queue_length_B = tf.size(filename_B)
+
+        filename_A_queue = tf.train.string_input_producer(filename_A)
+        filename_B_queue = tf.train.string_input_producer(filename_B)
+
+        image_reader = tf.WholeFileReader()
+        _, image_file_A = image_reader.read(filename_A_queue)
+        _, image_file_B = image_reader.read(filename_B_queue)
+        self.image_A = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_jpeg(image_file_A),[256,256]),127.5),1)
+        self.image_B = tf.subtract(tf.div(tf.image.resize_images(tf.image.decode_jpeg(image_file_B),[256,256]),127.5),1)
+
+
+    def input_read(self,sess):
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(coord=coord)
+
+        num_file_A = sess.run(self.queue_length_A)
+        num_file_B = sess.run(self.queue_length_B)
+
+        self.fake_images_A = np.zeros((pool_size,1,img_height,img_width,img_layer))
+        self.fake_images_B = np.zeros((pool_size,1,img_height,img_width,img_layer))
+
+        self.A_input = np.zeros((max_images,batch_size,img_height,img_width,img_layer))
+        self.B_input = np.zeros((max_images,batch_size,img_height,img_width,img_layer))
+
+        for i in range(max_images):
+            image_tensor = sess.run(self.image_A)
+            if image_tensor.size==img_width*img_height*img_layer:
+                self.A_input[i] = image_tensor.reshape((batch_size,img_height,img_width,img_layer))
+
+        for i in range(max_images):
+            image_tensor = sess.run(self.image_B)
+            if image_tensor.size==img_width*img_height*img_layer:
+                self.B_input[i] = image_tensor.reshape((batch_size,img_height,img_width,img_layer))
+
+        coord.request_stop()
+        coord.join(threads)
+
+
+
+    def model_setup(self):
+        self.input_A = tf.placeholder(dtype=tf.float32,shape=[batch_size,img_height,img_width,img_layer],name="input_A")
+        self.input_B = tf.placeholder(dtype=tf.float32,shape=[batch_size,img_height,img_width,img_layer],name="input_B")
+        self.fake_pool_A = tf.placeholder(dtype=tf.float32,shape=[None,img_height,img_width,img_layer],name="fake_pool_A")
+        self.fake_pool_B = tf.placeholder(dtype=tf.float32,shape=[None,img_height,img_width,img_layer],name="fake_pool_B")
+
+        self.global_step =tf.Variable(0,trainable=False,name="global_step")
+        self.num_fake_inputs = 0
+
+        self.lr = tf.placeholder(dtype=tf.float32,shape=[],name="lr")
+
+        with tf.variable_scope("Model") as scope:
+            self.gammas_B,self.betas_B = Pnet(self.input_B,name="Pnet")
+            self.fake_B = Tnet(self.input_A,self.gammas_B,self.betas_B,name="Tnet")
+            self.rec_A = generate_discriminator(self.input_A, name="d_A")
+            self.fake_B_rec = generate_discriminator(self.fake_B,name="d_B")
+
+            scope.reuse_variables()
+
+            self.gammas_A,self.betas_A = Pnet(self.input_A,name="Pnet")
+            self.fake_A = Tnet(self.input_B,self.gammas_A,self.betas_A,name="Tnet")
+            self.rec_B = generate_discriminator(self.input_B,name="d_B")
+            self.fake_A_rec = generate_discriminator(self.fake_A,name="d_A")
+
+            scope.reuse_variables()
+
+            self.fake_pool_A_rec = generate_discriminator(self.fake_pool_A,name="d_A")
+            self.fake_pool_B_rec = generate_discriminator(self.fake_pool_B,name="d_B")
+
+            scope.reuse_variables()
+            self.cyc_A = Tnet(self.fake_B,self.gammas_A,self.betas_A,name="Tnet")
+
+            scope.reuse_variables()
+            self.cyc_B = Tnet(self.fake_A,self.gammas_B,self.betas_B,name="Tnet")
+
+    def loss_cals(self):
+        cyc_loss = tf.reduce_mean(tf.abs(self.input_A-self.cyc_A))+tf.reduce_mean(tf.abs(self.input_B-self.cyc_B))
+        disc_loss_A = tf.reduce_mean(tf.squared_difference(self.fake_A_rec,1))
+        disc_loss_B = tf.reduce_mean(tf.squared_difference(self.fake_B_rec,1))
+        g_loss = cyc_loss*10+disc_loss_A+disc_loss_B
+
+        d_loss_A = tf.reduce_mean(tf.squared_difference(self.rec_A,1))+tf.reduce_mean(tf.square(self.fake_pool_A_rec))
+        d_loss_B = tf.reduce_mean(tf.squared_difference(self.rec_B,1))+tf.reduce_mean(tf.square(self.fake_pool_B_rec))
+
+        optimizer = tf.train.AdamOptimizer(self.lr,beta1=0.5)
+
+        self.model_vars = tf.trainable_variables()
+
+        g_vars = [var for var in self.model_vars if "Pnet" in var.name or "Tnet" in var.name]
+        d_A_vars = [var for var in self.model_vars if "d_A" in var.name]
+        d_B_vars = [var for var in self.model_vars if "d_B" in var.name]
+
+        self.g_trainer = optimizer.minimize(g_loss,var_list=g_vars)
+        self.d_A_trainer = optimizer.minimize(d_loss_A,var_list=d_A_vars)
+        self.d_B_trainer = optimizer.minimize(d_loss_B,var_list=d_B_vars)
+
+        for var in self.model_vars:
+            print(var.name)
+
+        self.g_loss = tf.summary.scalar("g_loss",g_loss)
+        self.d_A_loss = tf.summary.scalar("d_loss_A",d_loss_A)
+        self.d_B_loss = tf.summary.scalar("d_loss_B",d_loss_B)
+
+
+    def save_training_images(self, sess, epoch):
+        if not os.path.exists("./output/imgs"):
+            os.makedirs("./output/imgs")
+
+        for i in range(0, 10):
+            fake_A_temp, fake_B_temp, cyc_A_temp, cyc_B_temp = sess.run(
+                [self.fake_A, self.fake_B, self.cyc_A, self.cyc_B], feed_dict={
+                    self.input_A: self.A_input[i],
+                    self.input_B: self.B_input[i]
+                })
+            imsave("./output/imgs/fakeA_" + str(epoch) + "_" + str(i) + ".jpg",
+                   ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8))
+            imsave("./output/imgs/fakeB_" + str(epoch) + "_" + str(i) + ".jpg",
+                   ((fake_B_temp[0] + 1) * 127.5).astype(np.uint8))
+            imsave("./output/imgs/cycA_" + str(epoch) + "_" + str(i) + ".jpg",
+                   ((cyc_A_temp[0] + 1) * 127.5).astype(np.uint8))
+            imsave("./output/imgs/cycB_" + str(epoch) + "_" + str(i) + ".jpg",
+                   ((cyc_B_temp[0] + 1) * 127.5).astype(np.uint8))
+
+
+    def fake_image_pool(self,num_fake,fake,fake_pool):
+        if num_fake<pool_size:
+            fake_pool[num_fake] = fake
+            return fake
+        else:
+            p = random.random()
+            if p>0.5:
+                random_id = random.randint(0,pool_size-1)
+                temp = fake_pool[random_id]
+                fake_pool[random_id] = fake
+                return temp
+            else:
+                return fake
+
+
+    def train(self):
+        self.input_setup()
+        self.model_setup()
+        self.loss_cals()
+
+        init = [tf.local_variables_initializer(),tf.global_variables_initializer()]
+        saver = tf.train.Saver()
+
+        with tf.Session() as sess:
+            sess.run(init)
+            self.input_read(sess)
+
+            if to_restore:
+                chkpt_fanem = tf.train.latest_checkpoint(check_dir)
+                saver.restore(sess,chkpt_fanem)
+
+            writer = tf.summary.FileWriter("./output/2")
+
+            if not os.path.exists(check_dir):
+                os.makedirs(check_dir)
+
+            for epoch in range(sess.run(self.global_step),100):
+                print("In the epoch ",epoch)
+                saver.save(sess,os.path.join(check_dir,"MakeupEmbeddingGAN"),global_step=epoch)
+
+                if epoch<100:
+                    curr_lr = 0.0002
+                else:
+                    curr_lr = 0.0002-0.0002*(epoch-100)/100
+
+                if save_training_images:
+                    self.save_training_images(sess,epoch)
+
+                for ptr in range(max_images):
+                    print("In the iteration ",ptr)
+                    print(time.ctime())
+
+                    # optimize generator (Pnet & Tnet)
+                    _,summary_str,fake_A_temp,fake_B_temp = sess.run(
+                        [self.g_trainer,self.g_loss,self.fake_A,self.fake_B],feed_dict={
+                            self.lr:curr_lr,
+                            self.input_A:self.A_input[ptr],
+                            self.input_B:self.B_input[ptr],
+                        }
+                    )
+                    writer.add_summary(summary_str,global_step=epoch*max_images+ptr)
+
+                    # optimize d_A
+                    fake_pool_A_temp = self.fake_image_pool(self.num_fake_inputs,fake_A_temp,self.fake_images_A)
+                    _,summary_str = sess.run(
+                        [self.d_A_trainer,self.d_A_loss],feed_dict={
+                            self.lr:curr_lr,
+                            self.input_A:self.A_input[ptr],
+                            self.input_B:self.B_input[ptr],
+                            self.fake_pool_A:fake_pool_A_temp,
+                        }
+                    )
+                    writer.add_summary(summary_str,global_step=epoch*max_images+ptr)
+
+                    # optimize d_B
+                    fake_pool_B_temp = self.fake_image_pool(self.num_fake_inputs,fake_B_temp,self.fake_images_B)
+                    _,summary_str = sess.run(
+                        [self.d_B_trainer,self.d_B_loss],feed_dict={
+                            self.lr:curr_lr,
+                            self.input_A:self.A_input[ptr],
+                            self.input_B:self.B_input[ptr],
+                            self.fake_pool_B:fake_pool_B_temp,
+                        }
+                    )
+                    writer.add_summary(summary_str, global_step=epoch * max_images + ptr)
+
+                    self.num_fake_inputs+=1
+                sess.run(tf.assign(self.global_step,epoch+1))
+
+            writer.add_graph(sess.graph)
+
+
+    def test(self):
+        print("Testing the results")
+
+        self.input_setup()
+        self.model_setup()
+        self.loss_cals()
+
+        saver = tf.train.Saver()
+        init = [tf.local_variables_initializer(),tf.global_variables_initializer()]
+
+        with tf.Session() as sess:
+            sess.run(init)
+            self.input_read(sess)
+
+            chkpt_fname = tf.train.latest_checkpoint(check_dir)
+            saver.restore(sess,chkpt_fname)
+
+            if not os.path.exists("./output/imgs/test"):
+                os.makedirs("./output/imgs/test")
+
+            for i in range(max_images):
+                fake_A_temp,fake_B_temp = sess.run([self.fake_A,self.fake_B],feed_dict={
+                    self.input_A:self.A_input[i],
+                    self.input_B:self.B_input[i]
+                })
+                imsave("./output/imgs/test/fakeA_" + str(i) + ".jpg",
+                       ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8))
+                imsave("./output/imgs/test/fakeB_" + str(i) + ".jpg",
+                       ((fake_B_temp[0] + 1) * 127.5).astype(np.uint8))
+
+
+def main():
+    model = MakeupEmbeddingGAN()
+    if to_train:
+        model.train()
+    elif to_test:
+        model.test()
+
+
+if __name__=="__main__":
+    main()
