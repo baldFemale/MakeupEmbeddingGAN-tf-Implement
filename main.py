@@ -1,4 +1,5 @@
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
 import cv2
 import dlib
@@ -299,6 +300,7 @@ class MakeupEmbeddingGAN():
         d_loss_B = tf.reduce_mean(tf.squared_difference(self.rec_B,1))+tf.reduce_mean(tf.square(self.fake_pool_B_rec))
 
         optimizer = tf.train.AdamOptimizer(self.lr,beta1=0.5)
+        # optimizer = tfp.optimizer.StochasticGradientLangevinDynamics(learning_rate=self.lr,preconditioner_decay_rate=0.99)
 
         self.model_vars = tf.trainable_variables()
 
