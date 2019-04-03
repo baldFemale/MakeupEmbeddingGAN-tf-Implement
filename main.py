@@ -220,8 +220,8 @@ class MakeupEmbeddingGAN():
         t_quantiles = tf.divide(t_quantiles, tf.gather(t_quantiles, t_last_element))
 
         nearest_indices = tf.map_fn(lambda x: tf.argmin(tf.abs(tf.subtract(t_quantiles, x))), s_quantiles,
-                                    dtype=tf.int64)
-        s_bin_index = tf.to_int64(tf.divide(source, hist_delta))
+                                    dtype=tf.int32)
+        s_bin_index = tf.to_int32(tf.divide(source, hist_delta))
         s_bin_index = tf.clip_by_value(s_bin_index, 0, 254)
 
         matched_to_t = tf.gather(hist_range, tf.gather(nearest_indices, s_bin_index))
@@ -397,7 +397,7 @@ class MakeupEmbeddingGAN():
                 if save_training_images:
                     self.save_training_images(sess,epoch)
 
-                for ptr in range(max_images):
+                for ptr in range(self.train_num):
                     print("In the iteration ",ptr)
                     print(time.ctime())
 
@@ -409,7 +409,7 @@ class MakeupEmbeddingGAN():
                             self.input_B:self.B_input[ptr],
                         }
                     )
-                    writer.add_summary(summary_str,global_step=epoch*max_images+ptr)
+                    writer.add_summary(summary_str,global_step=epoch*self.train_num+ptr)
 
                     # optimize d_A
                     fake_pool_A_temp = self.fake_image_pool(self.num_fake_inputs,fake_A_temp,self.fake_images_A)
@@ -421,7 +421,7 @@ class MakeupEmbeddingGAN():
                             self.fake_pool_A:fake_pool_A_temp,
                         }
                     )
-                    writer.add_summary(summary_str,global_step=epoch*max_images+ptr)
+                    writer.add_summary(summary_str,global_step=epoch*self.train_num+ptr)
 
                     # optimize d_B
                     fake_pool_B_temp = self.fake_image_pool(self.num_fake_inputs,fake_B_temp,self.fake_images_B)
@@ -433,7 +433,7 @@ class MakeupEmbeddingGAN():
                             self.fake_pool_B:fake_pool_B_temp,
                         }
                     )
-                    writer.add_summary(summary_str, global_step=epoch * max_images + ptr)
+                    writer.add_summary(summary_str, global_step=epoch * self.train_num + ptr)
 
                     self.num_fake_inputs+=1
                 sess.run(tf.assign(self.global_step,epoch+1))
@@ -461,7 +461,7 @@ class MakeupEmbeddingGAN():
             if not os.path.exists("./output/imgs/test"):
                 os.makedirs("./output/imgs/test")
 
-            for i in range(max_images):
+            for i in range(self.train_num):
                 fake_A_temp,fake_B_temp = sess.run([self.fake_A,self.fake_B],feed_dict={
                     self.input_A:self.A_input[i],
                     self.input_B:self.B_input[i]
