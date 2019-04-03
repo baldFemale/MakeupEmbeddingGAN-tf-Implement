@@ -22,6 +22,36 @@ def lrelu(x,leak=0.2,name="lrelu",alt_relu_impl=True):
             return tf.maximum(x,leak*x)
 
 
+def spectral_norm(x, iteration=1):
+    """
+    following taki0112's implement
+    :param x:
+    :param iteration:
+    :return:
+    """
+    with tf.variable_scope("spectral_norm"):
+        x_shape = x.shape.as_list()
+        w = tf.reshape(x, [-1, x_shape[-1]])
+        u = tf.get_variable("u", [1, x_shape[-1]], initializer=tf.random_normal_initializer(), trainable=False)
+        u_hat = u
+        v_hat = None
+
+        for i in range(iteration):
+            v_ = tf.matmul(u_hat, tf.transpose(w))
+            v_hat = tf.nn.l2_normalize(v_, dim=None)
+            u_ = tf.matmul(v_hat, w)
+            u_hat = tf.nn.l2_normalize(u_, dim=None)
+        u_hat = tf.stop_gradient(u_hat)
+        v_hat = tf.stop_gradient(v_hat)
+
+        sigma = tf.matmul(tf.matmul(v_hat, w), tf.transpose(u_hat))
+
+        with tf.control_dependencies([u.assign(u_hat)]):
+            w_norm = w / sigma
+            w_norm = tf.reshape(w_norm, [-1]+x_shape[1:])
+        return w_norm
+
+
 def generate_conv(input_tensor,num_outputs,kernel_size,stride,padding="SAME",name="conv",
                   stddev=0.02,do_norm=False,norm_gamma=None,norm_beta=None,do_spec=False,do_relu=False,relufactor=0):
     with tf.variable_scope(name):
@@ -39,7 +69,7 @@ def generate_conv(input_tensor,num_outputs,kernel_size,stride,padding="SAME",nam
             conv = instance_norm(conv,gamma=norm_gamma,beta=norm_beta)
         else:
             if do_spec:
-                pass
+                conv = spectral_norm(conv)
 
         if do_relu:
             if relufactor==0:
@@ -66,7 +96,7 @@ def generate_deconv(input_tensor,num_outputs,kernel_size,stride,padding="SAME",n
             deconv = instance_norm(deconv,gamma=norm_gamma,beta=norm_beta)
         else:
             if do_spec:
-                pass
+                deconv = spectral_norm(deconv)
 
         if do_relu:
             if relufactor==0:

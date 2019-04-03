@@ -115,10 +115,10 @@ def generate_discriminator(inputdis,name="discriminator"):
         o_c1 = generate_conv(inputdis,num_outputs=ndf,kernel_size=f,stride=2,padding="SAME",name="c1",
                              do_relu=True,relufactor=0.2)  # 1*128*128*64
         o_c2 = generate_conv(o_c1,num_outputs=ndf*2,kernel_size=f,stride=2,padding="SAME",name="c2",
-                             do_norm=True,do_relu=True,relufactor=0.2)  # 1*64*64*128
+                             do_spec=True,do_relu=True,relufactor=0.2)  # 1*64*64*128
         o_c3 = generate_conv(o_c2, num_outputs=ndf * 4, kernel_size=f, stride=2, padding="SAME", name="c3",
-                             do_norm=True, do_relu=True, relufactor=0.2)  # 1*32*32*256
+                             do_spec=True, do_relu=True, relufactor=0.2)  # 1*32*32*256
         o_c4 = generate_conv(o_c3, num_outputs=ndf * 8, kernel_size=f, stride=1, padding="SAME", name="c4",
-                             do_norm=True, do_relu=True, relufactor=0.2)  # 1*32*32*512
+                             do_spec=True, do_relu=True, relufactor=0.2)  # 1*32*32*512
         o_c5 = generate_conv(o_c4, num_outputs=1, kernel_size=f, stride=1, padding="SAME", name="c5")  # 1*32*32*1
         return o_c5
