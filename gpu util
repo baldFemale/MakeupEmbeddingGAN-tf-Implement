@@ -1,0 +1,5 @@
+adam optimizer:
+	all loss 200ptr 200s/gpu low util 3%-76%
+	with out per loss 200ptr/197s gpu low util 3%-76%
+	with out his loss 200ptr/60s gpu high util 70%-90%
+

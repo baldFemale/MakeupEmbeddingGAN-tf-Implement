@@ -1,10 +1,14 @@
+import os
+
+os.environ['CUDA_VISIBLE_DEVICES']='1'
+
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 import cv2
 import dlib
-import os
 import random
+import pickle
 import time
 import vgg16
 from scipy.misc import imsave
@@ -15,7 +19,7 @@ img_height = 256
 img_width = 256
 img_layer = 3
 pool_size = 50
-max_images = 1
+max_images = 1050
 
 to_restore = False
 to_train = True
@@ -23,17 +27,18 @@ to_test = False
 save_training_images = False
 out_path = "./output"
 check_dir = "./output/checkpoints/"
+load_dir = "imgs.txt"
 
 
 class MakeupEmbeddingGAN():
     def input_setup(self):
-        filename_A = tf.train.match_filenames_once("./Japanese_after_rotate/*.jpg")
+        filename_A = tf.train.match_filenames_once("./all/images/non-makeup/*.png")
         self.queue_length_A = tf.size(filename_A)
-        filename_B = tf.train.match_filenames_once("./smokey_after_rotate/*.jpg")
+        filename_B = tf.train.match_filenames_once("./all/images/makeup/*.png")
         self.queue_length_B = tf.size(filename_B)
 
-        filename_A_queue = tf.train.string_input_producer(filename_A)
-        filename_B_queue = tf.train.string_input_producer(filename_B)
+        filename_A_queue = tf.train.string_input_producer(filename_A,shuffle=False)
+        filename_B_queue = tf.train.string_input_producer(filename_B,shuffle=False)
 
         image_reader = tf.WholeFileReader()
         _, image_file_A = image_reader.read(filename_A_queue)
@@ -101,31 +106,51 @@ class MakeupEmbeddingGAN():
         self.A_input_mask = np.zeros((max_images,3,img_height,img_width))
         self.B_input_mask = np.zeros((max_images,3,img_height,img_width))
 
-        cur_A = 0
-        for i in range(max_images):
-            image_tensor = sess.run(self.image_A)
-            if image_tensor.size==img_width*img_height*img_layer:
-                temp = ((image_tensor+1)*127.5).astype(np.uint8)
-                res = self.get_mask(temp,self.detector,self.predictor)
-                if res is not None:
-                    self.A_input[i] = image_tensor.reshape((batch_size,img_height,img_width,img_layer))
-                    self.A_input_mask[cur_A][0] = np.equal(res[0],255)
-                    self.A_input_mask[cur_A][1] = np.equal(res[1],255)
-                    self.A_input_mask[cur_A][2] = np.equal(res[2],255)
-                    cur_A+=1
+        if not os.path.exists(load_dir):
+            cur_A = 0
+            for i in range(max_images):
+                image_tensor = sess.run(self.image_A)
+                if image_tensor.size==img_width*img_height*img_layer:
+                    temp = ((image_tensor+1)*127.5).astype(np.uint8)
+                    res = self.get_mask(temp,self.detector,self.predictor)
+                    if res is not None:
+                        self.A_input[i] = image_tensor.reshape((batch_size,img_height,img_width,img_layer))
+                        self.A_input_mask[cur_A][0] = np.equal(res[0],255)
+                        self.A_input_mask[cur_A][1] = np.equal(res[1],255)
+                        self.A_input_mask[cur_A][2] = np.equal(res[2],255)
+                        cur_A+=1
 
-        cur_B = 0
-        for i in range(max_images):
-            image_tensor = sess.run(self.image_B)
-            if image_tensor.size==img_width*img_height*img_layer:
-                temp = ((image_tensor+1)*127.5).astype(np.uint8)
-                res = self.get_mask(temp,self.detector,self.predictor)
-                if res is not None:
-                    self.B_input[i] = image_tensor.reshape((batch_size,img_height,img_width,img_layer))
-                    self.B_input_mask[cur_B][0] = np.equal(res[0],255)
-                    self.B_input_mask[cur_B][1] = np.equal(res[1],255)
-                    self.B_input_mask[cur_B][2] = np.equal(res[2],255)
-                    cur_B += 1
+            cur_B = 0
+            for i in range(max_images):
+                image_tensor = sess.run(self.image_B)
+                if image_tensor.size==img_width*img_height*img_layer:
+                    temp = ((image_tensor+1)*127.5).astype(np.uint8)
+                    res = self.get_mask(temp,self.detector,self.predictor)
+                    if res is not None:
+                        self.B_input[i] = image_tensor.reshape((batch_size,img_height,img_width,img_layer))
+                        self.B_input_mask[cur_B][0] = np.equal(res[0],255)
+                        self.B_input_mask[cur_B][1] = np.equal(res[1],255)
+                        self.B_input_mask[cur_B][2] = np.equal(res[2],255)
+                        cur_B += 1
+
+            os.mknod(load_dir)
+            fw = open(load_dir,"wb")
+            pickle.dump(self.A_input,fw)
+            pickle.dump(self.B_input,fw)
+            pickle.dump(self.A_input_mask,fw)
+            pickle.dump(self.B_input_mask,fw)
+            pickle.dump(cur_A,fw)
+            pickle.dump(cur_B,fw)
+
+        else:
+            fr = open(load_dir,"rb")
+            self.A_input = pickle.load(fr)
+            self.B_input = pickle.load(fr)
+            self.A_input_mask = pickle.load(fr)
+            self.B_input_mask = pickle.load(fr)
+            cur_A = pickle.load(fr)
+            cur_B = pickle.load(fr)
+
         self.train_num = min(cur_A,cur_B)
         print("load img number: ",self.train_num)
 
@@ -221,8 +246,8 @@ class MakeupEmbeddingGAN():
         t_quantiles = tf.divide(t_quantiles, tf.gather(t_quantiles, t_last_element))
 
         nearest_indices = tf.map_fn(lambda x: tf.argmin(tf.abs(tf.subtract(t_quantiles, x))), s_quantiles,
-                                    dtype=tf.int32)
-        s_bin_index = tf.to_int32(tf.divide(source, hist_delta))
+                                    dtype=tf.int64)
+        s_bin_index = tf.to_int64(tf.divide(source, hist_delta))
         s_bin_index = tf.clip_by_value(s_bin_index, 0, 254)
 
         matched_to_t = tf.gather(hist_range, tf.gather(nearest_indices, s_bin_index))
@@ -409,6 +434,8 @@ class MakeupEmbeddingGAN():
                             self.lr:curr_lr,
                             self.input_A:self.A_input[ptr],
                             self.input_B:self.B_input[ptr],
+                            self.input_A_mask:self.A_input_mask[ptr],
+                            self.input_B_mask:self.B_input_mask[ptr],
                         }
                     )
                     writer.add_summary(summary_str,global_step=epoch*self.train_num+ptr)
