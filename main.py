@@ -22,8 +22,8 @@ pool_size = 50
 max_images = 1050
 
 to_restore = False
-to_train = True
-to_test = False
+to_train = False
+to_test = True
 save_training_images = False
 out_path = "./output"
 check_dir = "./output/checkpoints/"
@@ -107,6 +107,7 @@ class MakeupEmbeddingGAN():
         self.B_input_mask = np.zeros((max_images,3,img_height,img_width))
 
         if not os.path.exists(load_dir):
+            print("create pickle file")
             cur_A = 0
             for i in range(max_images):
                 image_tensor = sess.run(self.image_A)
@@ -143,6 +144,7 @@ class MakeupEmbeddingGAN():
             pickle.dump(cur_B,fw)
 
         else:
+            print("load pickle file")
             fr = open(load_dir,"rb")
             self.A_input = pickle.load(fr)
             self.B_input = pickle.load(fr)
@@ -412,14 +414,14 @@ class MakeupEmbeddingGAN():
             if not os.path.exists(check_dir):
                 os.makedirs(check_dir)
 
-            for epoch in range(sess.run(self.global_step),100):
+            for epoch in range(sess.run(self.global_step),500):
                 print("In the epoch ",epoch)
                 saver.save(sess,os.path.join(check_dir,"MakeupEmbeddingGAN"),global_step=epoch)
 
                 if epoch<100:
                     curr_lr = 0.0002
                 else:
-                    curr_lr = 0.0002-0.0002*(epoch-100)/100
+                    curr_lr = 0.0002-0.0002*(epoch-100)/400
 
                 if save_training_images:
                     self.save_training_images(sess,epoch)
@@ -495,6 +497,8 @@ class MakeupEmbeddingGAN():
                     self.input_A:self.A_input[i],
                     self.input_B:self.B_input[i]
                 })
+                imsave("./output/imgs/test/A_" + str(i) + ".jpg",((self.A_input[i][0]+1)*127.5).astype(np.uint8))
+                imsave("./output/imgs/test/B_" + str(i) + ".jpg",((self.B_input[i][0]+1)*127.5).astype(np.uint8))
                 imsave("./output/imgs/test/fakeA_" + str(i) + ".jpg",
                        ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8))
                 imsave("./output/imgs/test/fakeB_" + str(i) + ".jpg",
