@@ -145,6 +145,7 @@ class MakeupEmbeddingGAN():
             pickle.dump(self.B_input_mask,fw)
             pickle.dump(cur_A,fw)
             pickle.dump(cur_B,fw)
+            fw.close()
 
         else:
             fr = open(load_dir,"rb")
@@ -154,6 +155,7 @@ class MakeupEmbeddingGAN():
             self.B_input_mask = pickle.load(fr)
             cur_A = pickle.load(fr)
             cur_B = pickle.load(fr)
+            fr.close()
 
         self.train_num = min(cur_A,cur_B)
         print("load img number: ",self.train_num)
@@ -191,7 +193,7 @@ class MakeupEmbeddingGAN():
         self.input_A_mask = tf.placeholder(tf.bool,[3,img_height,img_width],name="input_A_mask")
         self.input_B_mask = tf.placeholder(tf.bool,[3,img_height,img_width],name="input_B_mask")
 
-        #using multi gpus
+        # using multi gpus
         # self.input_A_mask_multigpu = tf.placeholder(tf.bool, [gpu_num, 3, img_height, img_width], name="input_A_mask")
         # self.input_B_mask_multigpu = tf.placeholder(tf.bool, [gpu_num, 3, img_height, img_width], name="input_B_mask")
 
@@ -696,6 +698,7 @@ class MakeupEmbeddingGAN():
     #             sess.run(tf.assign(self.global_step,epoch+1))
     #         writer.add_graph(sess.graph)
 
+
     def test(self):
         print("Testing the results")
 
@@ -725,6 +728,59 @@ class MakeupEmbeddingGAN():
                        ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8))
                 imsave("./output/imgs/test/fakeB_" + str(i) + ".jpg",
                        ((fake_B_temp[0] + 1) * 127.5).astype(np.uint8))
+
+
+    def style_combine(self,content,styleI,styleII,sess,ratio):
+        """
+        :param content: content img
+        :param styleI: style A img
+        :param styleII: style B img
+        :param sess: tf.Session()
+        :param ratio: list->[ratio1,ratio2,....]
+        :return: None
+        """
+        gammas_A, betas_A = sess.run([self.gammas_B, self.betas_B], feed_dict={
+            self.input_B: styleI,
+        })
+        gammas_B, betas_B = sess.run([self.gammas_B, self.betas_B], feed_dict={
+            self.input_B: styleII,
+        })
+        for r in ratio:
+            gammas_input = {}
+            betas_input = {}
+            for key in gammas_A:
+                gammas_input[key] = tf.add(r*gammas_A,(1-r)*gammas_B)
+                betas_input[key] = tf.add(r*betas_A,(1-r)*betas_B)
+            fake_A_temp = sess.run([self.fake_A],feed_dict={
+                self.input_A:content,
+                self.gammas_B:gammas_input,
+                self.betas_B:betas_input,
+            })
+            imsave("./output/imgs/embedding_test/fakeA_" +"styleA_"+ str(r) + ".jpg",
+                   ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8))
+
+
+    def Embedding_test(self):
+        print("Testing Embedding Results")
+        self.input_setup()
+        self.model_setup()
+        self.loss_cals()
+
+        saver = tf.train.Saver()
+        init = [tf.local_variables_initializer(),tf.global_variables_initializer()]
+
+        with tf.Session() as sess:
+            sess.run(init)
+            self.input_read(sess)
+            chkpt_fname = tf.train.latest_checkpoint(check_dir)
+            saver.restore(sess,chkpt_fname)
+            if not os.path.exists("./output/imgs/embedding_test"):
+                os.makedirs("./output/imgs/embedding_test")
+
+            content_img = self.A_input[0]
+            style_A = self.B_input[0]
+            style_B = self.B_input[1]
+            self.style_combine(content_img,style_A,style_B,sess,[i/10 for i in range(11)])
 
 
 def main():
