@@ -7,6 +7,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 
 import numpy as np
+from sklearn.manifold import TSNE
 import cv2
 import dlib
 import random
@@ -758,6 +759,12 @@ class MakeupEmbeddingGAN():
             })
             imsave("./output/imgs/embedding_test/fakeA_" +"styleA_"+ str(r) + ".jpg",
                    ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8))
+
+
+    def TSNE(self,hidden_layer):
+        tsne = TSNE(n_components=2, perplexity=30.0,learning_rate=20.0,n_iter=5000)
+        output = tsne.fit_transform(hidden_layer)
+        return output
 
 
     def Embedding_test(self):
