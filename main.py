@@ -754,12 +754,12 @@ class MakeupEmbeddingGAN():
             gammas_input = {}
             betas_input = {}
             for key in gammas_A:
-                gammas_input[key] = tf.add(r*gammas_A,(1-r)*gammas_B)
-                betas_input[key] = tf.add(r*betas_A,(1-r)*betas_B)
+                gammas_input[key] = tf.add(r*gammas_A[key],(1-r)*gammas_B[key])
+                betas_input[key] = tf.add(r*betas_A[key],(1-r)*betas_B[key])
             fake_A_temp = sess.run([self.fake_A],feed_dict={
                 self.input_A:content,
                 self.gammas_B:gammas_input,
-                self.betas_B:betas_input,
+                # self.betas_B:betas_input,
             })
             imsave("./output/imgs/embedding_test/fakeA_" +"styleA_"+ str(r) + ".jpg",
                    ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8))
@@ -788,9 +788,9 @@ class MakeupEmbeddingGAN():
             if not os.path.exists("./output/imgs/embedding_test"):
                 os.makedirs("./output/imgs/embedding_test")
 
-            content_img = self.A_input[0]
-            style_A = self.B_input[0]
-            style_B = self.B_input[1]
+            content_img = self.A_input[404]
+            style_A = self.B_input[404]
+            style_B = self.B_input[261]
             self.style_combine(content_img,style_A,style_B,sess,[i/10 for i in range(11)])
 
 
@@ -799,7 +799,7 @@ def main():
     if to_train:
         model.train()
     elif to_test:
-        model.test()
+        model.Embedding_test()
 
 
 if __name__=="__main__":
