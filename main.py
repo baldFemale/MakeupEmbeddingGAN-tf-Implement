@@ -751,6 +751,9 @@ class MakeupEmbeddingGAN():
         gammas_B, betas_B = sess.run([self.gammas_B, self.betas_B], feed_dict={
             self.input_B: styleII,
         })
+        imsave("./output/imgs/embedding_test/content.jpg",((content[0]+1)*127.5).astype(np.uint8))
+        imsave("./output/imgs/embedding_test/styleI.jpg",((styleI[0]+1)*127.5).astype(np.uint8))
+        imsave("./output/imgs/embedding_test/styleII.jpg",((styleII[0]+1)*127.5).astype(np.uint8))
         for r in ratio:
             gammas_input = {}
             betas_input = {}
@@ -770,7 +773,7 @@ class MakeupEmbeddingGAN():
                    ((fake_A_temp[0] + 1) * 127.5).astype(np.uint8)[0])
 
 
-    def TSNE(self,hidden_layer):
+    def TSNE(self,hidden_layers):
         print("Testing Embedding on TSNE")
         self.input_setup()
         self.model_setup()
@@ -783,22 +786,22 @@ class MakeupEmbeddingGAN():
             self.input_read(sess)
             chkpt_fname = tf.train.latest_checkpoint(check_dir)
             saver.restore(sess,chkpt_fname)
-            if not os.path.exists(tsne_file):
-                os.mknod(tsne_file)
-            gamma_data = []
-            beta_data = []
-            for i in range(self.train_num):
-                temp_gamma,temp_beta = sess.run([self.gammas_B[hidden_layer],self.betas_B[hidden_layer]],feed_dict={
-                    self.input_B:self.B_input[i]
-                })
-                gamma_data.append(temp_gamma)
-                beta_data.append(temp_beta)
-        tsne = TSNE(n_components=2, perplexity=30.0,learning_rate=20.0,n_iter=5000)
-        gamma_output = tsne.fit_transform(np.array(gamma_data))
-        beta_output = tsne.fit_transform(np.array(beta_data))
-        print(gamma_output.shape,beta_output.shape)
-        np.savetxt(tsne_file,gamma_output)
-        np.savetxt(tsne_file,beta_output)
+            for hidden_layer in hidden_layers:
+                gamma_data = []
+                beta_data = []
+                for i in range(self.train_num):
+                    temp_gamma,temp_beta = sess.run([self.gammas_B[hidden_layer],self.betas_B[hidden_layer]],feed_dict={
+                        self.input_B:self.B_input[i]
+                    })
+                    gamma_data.append(temp_gamma)
+                    beta_data.append(temp_beta)
+            # tsne = TSNE(n_components=2, perplexity=30.0,learning_rate=20.0,n_iter=5000)
+            # gamma_output = tsne.fit_transform(np.array(gamma_data))
+            # beta_output = tsne.fit_transform(np.array(beta_data))
+                os.mknod("gamma_data_"+hidden_layer+".txt")
+                np.savetxt("gamma_data_"+hidden_layer+".txt",np.array(gamma_data))
+                os.mknod("beta_data_"+hidden_layer+".txt")
+                np.savetxt("beta_data"+hidden_layer+".txt",np.array(beta_data))
 
 
 
@@ -830,7 +833,7 @@ def main():
     if to_train:
         model.train()
     elif to_test:
-        model.TSNE("r9_1")
+        model.TSNE(["r1_1","r2_1","r3_1","r4_1","r5_1","r6_1","r7_1","r8_1","r9_1"])
 
 
 if __name__=="__main__":
