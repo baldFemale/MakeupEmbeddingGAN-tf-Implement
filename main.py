@@ -795,13 +795,26 @@ class MakeupEmbeddingGAN():
                     })
                     gamma_data.append(temp_gamma)
                     beta_data.append(temp_beta)
-            # tsne = TSNE(n_components=2, perplexity=30.0,learning_rate=20.0,n_iter=5000)
-            # gamma_output = tsne.fit_transform(np.array(gamma_data))
-            # beta_output = tsne.fit_transform(np.array(beta_data))
+
+                print("gamma for "+hidden_layer+" output")
                 os.mknod("gamma_data_"+hidden_layer+".txt")
                 np.savetxt("gamma_data_"+hidden_layer+".txt",np.array(gamma_data))
+
+                print("beta for "+hidden_layer+" output")
                 os.mknod("beta_data_"+hidden_layer+".txt")
                 np.savetxt("beta_data"+hidden_layer+".txt",np.array(beta_data))
+
+                tsne = TSNE(n_components=2, perplexity=30.0,learning_rate=20.0,n_iter=5000)
+
+                print("gamma tsne for "+hidden_layer+" output")
+                os.mknod("gamma_tsne_output_"+hidden_layer+".txt")
+                gamma_output = tsne.fit_transform(np.array(gamma_data))
+                np.save("gamma_tsne_output_"+hidden_layer+".txt",gamma_output)
+
+                print("beta tsne for "+hidden_layer+" output")
+                os.mknod("beta_tsne_output_"+hidden_layer+".txt")
+                beta_output = tsne.fit_transform(np.array(beta_data))
+                np.save("beta_tsne_output_"+hidden_layer+".txt",beta_output)
 
 
 
