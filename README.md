@@ -3,5 +3,6 @@
 ## Model Design
 * Using AdaIN in parallel Pnet(StylePredictingNet) and Tnet(StyleTransferNet) Architecture  
 
-![image](https://github.com/baldFemale/MakeupEmbeddingGAN-tf-Implement/raw/master/present/Architecture_1.png)  
+![image](https://github.com/baldFemale/MakeupEmbeddingGAN-tf-Implement/raw/master/present/Architecture_1.png)></div>
+<div align="center"><img width="50%" src="https://github.com/baldFemale/MakeupEmbeddingGAN-tf-Implement/raw/master/present/Architecture_1.png">
 ![image](https://github.com/baldFemale/MakeupEmbeddingGAN-tf-Implement/raw/master/present/generator_arch.png)
