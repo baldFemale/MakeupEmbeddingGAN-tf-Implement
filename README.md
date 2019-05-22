@@ -4,8 +4,10 @@
 * Using AdaIN in parallel Pnet(StylePredictingNet) and Tnet(StyleTransferNet) Architecture  
 ###### Model Architecture
 <div align="center"><img width="50%" src="https://github.com/baldFemale/MakeupEmbeddingGAN-tf-Implement/raw/master/present/Architecture_1.png"></div>  
+
 ###### Generator Architecture
 <div align="center"><img width="50%" src="https://github.com/baldFemale/MakeupEmbeddingGAN-tf-Implement/raw/master/present/generator_arch.png"></div>  
+
 ###### Discriminator Architecture
 * Same 70*70 patch discriminator as cycleGAN  
 
