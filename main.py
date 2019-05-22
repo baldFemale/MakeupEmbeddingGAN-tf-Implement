@@ -371,15 +371,17 @@ class MakeupEmbeddingGAN():
             self.fake_A_rec = generate_discriminator(self.fake_A,name="d_A")
 
             scope.reuse_variables()
-
+            
+            self.gammas_fakeA,self.betas_fakeA = Pnet(self.fake_A,name="Pnet")
             self.fake_pool_A_rec = generate_discriminator(self.fake_pool_A,name="d_A")
             self.fake_pool_B_rec = generate_discriminator(self.fake_pool_B,name="d_B")
 
             scope.reuse_variables()
-            self.cyc_A = Tnet(self.fake_B,self.gammas_A,self.betas_A,name="Tnet")
+            self.gammas_fakeB,self.betas_fakeB = Pnet(self.fake_B,name="Pnet")
+            self.cyc_A = Tnet(self.fake_B,self.gammas_fakeA,self.betas_fakeA,name="Tnet")
 
             scope.reuse_variables()
-            self.cyc_B = Tnet(self.fake_A,self.gammas_B,self.betas_B,name="Tnet")
+            self.cyc_B = Tnet(self.fake_A,self.gammas_fakeB,self.betas_fakeB,name="Tnet")
 
             self.perc_A = tf.cast(tf.image.resize_images((self.input_A+1)*127.5,[224,224]),tf.float32)
             self.perc_B = tf.cast(tf.image.resize_images((self.input_B+1)*127.5, [224, 224]), tf.float32)
