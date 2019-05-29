@@ -244,7 +244,27 @@ class MakeupEmbeddingGAN():
         #                 scope.reuse_variables()
         #
         #                 self.cyc_B = Tnet(self.fake_A,self.gammas_B,self.betas_B,name="Tnet")
+        #                 scope.reuse_variables()
         #
+        #                 self.gammas_B_cyc, self.betas_B_cyc = Pnet(self.cyc_B, name="Pnet")
+        #                 self.fake_cyc_B = Tnet(self.cyc_A, self.gammas_B_cyc, self.betas_B_cyc, name="Tnet")
+        #                 self.rec_cyc_A = generate_discriminator(self.cyc_A, name="d_A")
+        #                 self.fake_cyc_B_rec = generate_discriminator(self.fake_cyc_B, name="d_B")
+        #                 scope.reuse_variables()
+        #
+        #                 self.gammas_A_cyc, self.betas_A_cyc = Pnet(self.cyc_A, name="Pnet")
+        #                 self.fake_cyc_A = Tnet(self.cyc_B, self.gammas_A_cyc, self.betas_A_cyc, name="Tnet")
+        #                 self.rec_cyc_B = generate_discriminator(self.cyc_B, name="d_B")
+        #                 self.fake_cyc_A_rec = generate_discriminator(self.fake_cyc_A, name="d_A")
+        #                 scope.reuse_variables()
+        #
+        #                 self.gammas_fake_cyc_A, self.betas_fake_cyc_A = Pnet(self.fake_cyc_A, name="Pnet")
+        #                 self.cyc_cyc_A = Tnet(self.fake_cyc_B, self.gammas_fake_cyc_A, self.betas_fake_cyc_A, name="Tnet")
+        #                 scope.reuse_variables()
+        #
+        #                 self.gammas_fake_cyc_B, self.betas_fake_cyc_B = Pnet(self.fake_cyc_B, name="Pnet")
+        #                 self.cyc_cyc_B = Tnet(self.fake_cyc_A, self.gammas_fake_cyc_B, self.betas_fake_cyc_B, name="Tnet")
+
         #                 self.perc_A = tf.cast(
         #                     tf.image.resize_images((tf.expand_dims(self.input_A_multigpu[gpu], 0) + 1) * 127.5,
         #                                            [224, 224]),
@@ -257,8 +277,15 @@ class MakeupEmbeddingGAN():
         #                                            tf.float32)
         #                 self.perc_fake_A = tf.cast(tf.image.resize_images((self.fake_A + 1) * 127.5, [224, 224]),
         #                                            tf.float32)
-        #                 self.perc = self.perc_loss_cal(
-        #                     tf.concat([self.perc_A, self.perc_B, self.perc_fake_B, self.perc_fake_A], axis=0))
+        #                 self.perc_cyc_A = tf.cast(tf.image.resize_images((self.cyc_A + 1) * 127.5, [224, 224]), tf.float32)
+        #                 self.perc_cyc_B = tf.cast(tf.image.resize_images((self.cyc_B + 1) * 127.5, [224, 224]), tf.float32)
+        #                 self.perc_fake_cyc_B = tf.cast(tf.image.resize_images((self.fake_cyc_B + 1) * 127.5, [224, 224]), tf.float32)
+        #                 self.perc_fake_cyc_A = tf.cast(tf.image.resize_images((self.fake_cyc_A + 1) * 127.5, [224, 224]), tf.float32)
+
+                        # self.perc = self.perc_loss_cal(tf.concat([
+                        #     self.perc_A, self.perc_B, self.perc_fake_B, self.perc_fake_A, self.perc_cyc_A, self.perc_cyc_B,
+                        #     self.perc_fake_cyc_B, self.perc_fake_cyc_A
+                        # ], axis=0))
         #                 percep_norm, var = tf.nn.moments(self.perc, [1, 2], keep_dims=True)
         #                 self.perc = tf.divide(self.perc, tf.add(percep_norm, 1e-5))
         #                 scope.reuse_variables()
@@ -266,8 +293,13 @@ class MakeupEmbeddingGAN():
         #                 cyc_loss = tf.reduce_mean(
         #                     tf.abs(self.input_A_multigpu[gpu, :, :, :] - self.cyc_A)) + tf.reduce_mean(
         #                     tf.abs(self.input_B_multigpu[gpu, :, :, :] - self.cyc_B))
+        #                 cyc_cascade_loss = tf.reduce_mean(tf.abs(self.cyc_A - self.cyc_cyc_A)) + tf.reduce_mean(
+        #                     tf.abs(self.cyc_B - self.cyc_cyc_B))
+
         #                 disc_loss_A = tf.reduce_mean(tf.squared_difference(self.fake_rec_A, 1))
         #                 disc_loss_B = tf.reduce_mean(tf.squared_difference(self.fake_rec_B, 1))
+        #                 disc_loss_cyc_A = tf.reduce_mean(tf.squared_difference(self.fake_cyc_A_rec,1))
+        #                 disc_loss_cyc_B = tf.reduce_mean(tf.squared_difference(self.fake_cyc_B_rec,1))
         #
         #                 temp_source = tf.cast((self.fake_B[0, :, :, 0] + 1) * 127.5, dtype=tf.float32)
         #                 temp_template = tf.cast((self.input_B_multigpu[gpu, :, :, 0] + 1) * 127.5, dtype=tf.float32)
@@ -282,6 +314,16 @@ class MakeupEmbeddingGAN():
         #                                                                 self.input_B_mask_multigpu[gpu][2])
         #                 histogram_loss_r = histogram_loss_r_face + histogram_loss_r_lip + histogram_loss_r_eye
         #
+                        # temp_source = tf.cast((self.fake_cyc_B[0, :, :, 0] + 1) * 127.5, dtype=tf.float32)
+                        # temp_template = tf.cast((self.cyc_B[0, :, :, 0] + 1) * 127.5, dtype=tf.float32)
+                        # histogram_loss_r_lip_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[0],
+                        #                                                    self.input_B_mask[0])
+                        # histogram_loss_r_eye_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
+                        #                                                    self.input_B_mask[1])
+                        # # histogram_loss_r_face_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+                        # #                                                 self.input_B_mask[2])
+                        # histogram_loss_r_cyc = histogram_loss_r_lip_cyc + histogram_loss_r_eye_cyc
+
         #                 temp_source = tf.cast((self.fake_B[0, :, :, 1] + 1) * 127.5, dtype=tf.float32)
         #                 temp_template = tf.cast((self.input_B_multigpu[gpu, :, :, 1] + 1) * 127.5, dtype=tf.float32)
         #                 histogram_loss_g_lip = self.histogram_loss_cal(temp_source, temp_template,
@@ -295,6 +337,16 @@ class MakeupEmbeddingGAN():
         #                                                                 self.input_B_mask_multigpu[gpu][2])
         #                 histogram_loss_g = histogram_loss_g_lip + histogram_loss_g_face + histogram_loss_g_eye
         #
+                        # temp_source = tf.cast((self.fake_cyc_B[0, :, :, 1] + 1) * 127.5, dtype=tf.float32)
+                        # temp_template = tf.cast((self.cyc_B[0, :, :, 1] + 1) * 127.5, dtype=tf.float32)
+                        # histogram_loss_g_lip_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[0],
+                        #                                                    self.input_B_mask[0])
+                        # histogram_loss_g_eye_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
+                        #                                                    self.input_B_mask[1])
+                        # # histogram_loss_g_face_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+                        # #                                                 self.input_B_mask[2])
+                        # histogram_loss_g_cyc = histogram_loss_g_lip_cyc + histogram_loss_g_eye_cyc
+
         #                 temp_source = tf.cast((self.fake_B[0, :, :, 2] + 1) * 127.5, dtype=tf.float32)
         #                 temp_template = tf.cast((self.input_B_multigpu[gpu, :, :, 2] + 1) * 127.5, dtype=tf.float32)
         #                 histogram_loss_b_lip = self.histogram_loss_cal(temp_source, temp_template,
@@ -308,22 +360,32 @@ class MakeupEmbeddingGAN():
         #                                                                 self.input_B_mask_multigpu[gpu][2])
         #                 histogram_loss_b = histogram_loss_b_lip + histogram_loss_b_face + histogram_loss_b_eye
         #
-        #                 makeup_loss = histogram_loss_r + histogram_loss_g + histogram_loss_b
+                        # temp_source = tf.cast((self.fake_cyc_B[0, :, :, 2] + 1) * 127.5, dtype=tf.float32)
+                        # temp_template = tf.cast((self.cyc_B[0, :, :, 2] + 1) * 127.5, dtype=tf.float32)
+                        # histogram_loss_b_lip_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[0],
+                        #                                                self.input_B_mask[0])
+                        # histogram_loss_b_eye_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
+                        #                                                self.input_B_mask[1])
+                        # # histogram_loss_b_face_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+                        # #                                                 self.input_B_mask[2])
+                        # histogram_loss_b_cyc = histogram_loss_b_lip_cyc + histogram_loss_b_eye_cyc
+                        #
+                        # makeup_loss = histogram_loss_r + histogram_loss_g + histogram_loss_b+histogram_loss_r_cyc+histogram_loss_g_cyc+histogram_loss_b_cyc
+                        #
+                        # perceptual_loss = tf.reduce_mean(tf.squared_difference(self.perc[0], self.perc[2])) + tf.reduce_mean(
+                        #     tf.squared_difference(self.perc[1], self.perc[3]))+tf.reduce_mean(
+                        #     tf.squared_difference(self.perc[4], self.perc[6]))+tf.reduce_mean(
+                        #     tf.squared_difference(self.perc[5],self.perc[7])
+        # )
         #
-        #                 # Using the same normalization as Gatys' neural style transfer
-        #                 # Increase the lambda from 0.005 to 0.05
-        #                 # cycle loss:2
-        #                 perceptual_loss = tf.reduce_mean(
-        #                     tf.squared_difference(self.perc[0], self.perc[2])) + tf.reduce_mean(
-        #                     tf.squared_difference(self.perc[1], self.perc[3]))
-        #
-        #                 g_loss = cyc_loss * 10 + disc_loss_B + disc_loss_A + perceptual_loss * 0.05 + makeup_loss
-        #
-        #                 d_loss_A = (tf.reduce_mean(tf.square(self.fake_pool_rec_A)) + tf.reduce_mean(
-        #                     tf.squared_difference(self.rec_A, 1))) / 2.0
-        #                 d_loss_B = (tf.reduce_mean(tf.square(self.fake_pool_rec_B)) + tf.reduce_mean(
-        #                     tf.squared_difference(self.rec_B, 1))) / 2.0
-        #
+
+                        # g_loss = cyc_loss * 20 + cyc_cascade_loss * 20 + disc_loss_A + disc_loss_B + disc_loss_cyc_A + disc_loss_cyc_B + makeup_loss + perceptual_loss * 0.05
+                        #
+                        # d_loss_A = tf.reduce_mean(tf.squared_difference(self.rec_A, 1)) + 2 * tf.reduce_mean(
+                        #     tf.square(self.fake_pool_A_rec)) + tf.reduce_mean(tf.squared_difference(self.fake_cyc_A_rec, 1))
+                        # d_loss_B = tf.reduce_mean(tf.squared_difference(self.rec_B, 1)) + 2 * tf.reduce_mean(
+                        #     tf.square(self.fake_pool_B_rec)) + tf.reduce_mean(tf.squared_difference(self.fake_cyc_B_rec, 1))
+
         #                 self.model_vars = tf.trainable_variables()
         #                 d_A_vars = [var for var in self.model_vars if "d_A" in var.name]
         #                 d_B_vars = [var for var in self.model_vars if "d_B" in var.name]
@@ -335,16 +397,19 @@ class MakeupEmbeddingGAN():
         #                 d_B_grad = optimizer.compute_gradients(d_loss_B, var_list=d_B_vars)
         #                 d_B_grads.append(d_B_grad)
         #
-        #                 self.disc_A_loss_sum = tf.summary.scalar("disc_loss_A", disc_loss_A)
-        #                 self.disc_B_loss_sum = tf.summary.scalar("disc_loss_B", disc_loss_B)
-        #                 self.cyc_loss_sum = tf.summary.scalar("cyc_loss", cyc_loss)
-        #                 self.makeup_loss_sum = tf.summary.scalar("makeup_loss", makeup_loss)
-        #                 self.percep_loss_sum = tf.summary.scalar("perceptual_loss", perceptual_loss)
-        #                 self.g_loss_sum = tf.summary.scalar("g_loss", g_loss)
+                        # self.disc_A_loss_sum = tf.summary.scalar("disc_loss_A",disc_loss_A)
+                        # self.disc_B_loss_sum = tf.summary.scalar("disc_loss_B",disc_loss_B)
+                        # self.disc_A_cyc_loss_sum = tf.summary.scalar("disc_loss_cyc_A", disc_loss_cyc_A)
+                        # self.disc_B_cyc_loss_sum = tf.summary.scalar("disc_loss_cyc_B", disc_loss_cyc_B)
+                        # self.cyc_loss_sum = tf.summary.scalar("cyc_loss",cyc_loss)
+                        # self.cyc_cascade_loss_sum = tf.summary.scalar("cyc_cascade_loss",cyc_cascade_loss)
+                        # self.makeup_loss_sum = tf.summary.scalar("makeup_loss",makeup_loss)
+                        # self.percep_loss_sum = tf.summary.scalar("perceptual_loss",perceptual_loss)
+                        # self.g_loss_sum = tf.summary.scalar("g_loss",g_loss)
         #
         #                 self.g_summary = tf.summary.merge([
         #                     self.disc_A_loss_sum, self.disc_B_loss_sum, self.cyc_loss_sum, self.makeup_loss_sum,
-        #                     self.percep_loss_sum, self.g_loss_sum
+        #                     self.percep_loss_sum, self.g_loss_sum,self.disc_A_cyc_loss_sum,self.disc_B_cyc_loss_sum,self.cyc_cascade_loss_sum,
         #                 ], "g_summary")
         #
         #                 self.d_A_loss_sum = tf.summary.scalar("d_A_loss", d_loss_A)
@@ -362,32 +427,58 @@ class MakeupEmbeddingGAN():
             self.fake_B = Tnet(self.input_A,self.gammas_B,self.betas_B,name="Tnet")
             self.rec_A = generate_discriminator(self.input_A, name="d_A")
             self.fake_B_rec = generate_discriminator(self.fake_B,name="d_B")
-
             scope.reuse_variables()
 
             self.gammas_A,self.betas_A = Pnet(self.input_A,name="Pnet")
             self.fake_A = Tnet(self.input_B,self.gammas_A,self.betas_A,name="Tnet")
             self.rec_B = generate_discriminator(self.input_B,name="d_B")
             self.fake_A_rec = generate_discriminator(self.fake_A,name="d_A")
-
             scope.reuse_variables()
             
             self.gammas_fakeA,self.betas_fakeA = Pnet(self.fake_A,name="Pnet")
             self.fake_pool_A_rec = generate_discriminator(self.fake_pool_A,name="d_A")
             self.fake_pool_B_rec = generate_discriminator(self.fake_pool_B,name="d_B")
-
             scope.reuse_variables()
+
             self.gammas_fakeB,self.betas_fakeB = Pnet(self.fake_B,name="Pnet")
             self.cyc_A = Tnet(self.fake_B,self.gammas_fakeA,self.betas_fakeA,name="Tnet")
-
             scope.reuse_variables()
+
             self.cyc_B = Tnet(self.fake_A,self.gammas_fakeB,self.betas_fakeB,name="Tnet")
+            scope.reuse_variables()
+
+            self.gammas_B_cyc,self.betas_B_cyc = Pnet(self.cyc_B,name="Pnet")
+            self.fake_cyc_B = Tnet(self.cyc_A,self.gammas_B_cyc,self.betas_B_cyc,name="Tnet")
+            self.rec_cyc_A = generate_discriminator(self.cyc_A,name="d_A")
+            self.fake_cyc_B_rec = generate_discriminator(self.fake_cyc_B,name="d_B")
+            scope.reuse_variables()
+
+            self.gammas_A_cyc,self.betas_A_cyc = Pnet(self.cyc_A,name="Pnet")
+            self.fake_cyc_A = Tnet(self.cyc_B,self.gammas_A_cyc,self.betas_A_cyc,name="Tnet")
+            self.rec_cyc_B = generate_discriminator(self.cyc_B,name="d_B")
+            self.fake_cyc_A_rec = generate_discriminator(self.fake_cyc_A,name="d_A")
+            scope.reuse_variables()
+
+            self.gammas_fake_cyc_A,self.betas_fake_cyc_A = Pnet(self.fake_cyc_A,name="Pnet")
+            self.cyc_cyc_A = Tnet(self.fake_cyc_B,self.gammas_fake_cyc_A,self.betas_fake_cyc_A,name="Tnet")
+            scope.reuse_variables()
+
+            self.gammas_fake_cyc_B,self.betas_fake_cyc_B = Pnet(self.fake_cyc_B,name="Pnet")
+            self.cyc_cyc_B = Tnet(self.fake_cyc_A,self.gammas_fake_cyc_B,self.betas_fake_cyc_B,name="Tnet")
+
 
             self.perc_A = tf.cast(tf.image.resize_images((self.input_A+1)*127.5,[224,224]),tf.float32)
             self.perc_B = tf.cast(tf.image.resize_images((self.input_B+1)*127.5, [224, 224]), tf.float32)
             self.perc_fake_B = tf.cast(tf.image.resize_images((self.fake_B+1)*127.5, [224, 224]), tf.float32)
             self.perc_fake_A = tf.cast(tf.image.resize_images((self.fake_A+1)*127.5, [224, 224]), tf.float32)
-            self.perc = self.perc_loss_cal(tf.concat([self.perc_A,self.perc_B,self.perc_fake_B,self.perc_fake_A],axis=0))
+            self.perc_cyc_A = tf.cast(tf.image.resize_images((self.cyc_A+1)*127.5,[224,224]),tf.float32)
+            self.perc_cyc_B = tf.cast(tf.image.resize_images((self.cyc_B+1)*127.5,[224,224]),tf.float32)
+            self.perc_fake_cyc_B = tf.cast(tf.image.resize_images((self.fake_cyc_B+1)*127.5,[224,224]),tf.float32)
+            self.perc_fake_cyc_A = tf.cast(tf.image.resize_images((self.fake_cyc_A+1)*127.5,[224,224]),tf.float32)
+
+            self.perc = self.perc_loss_cal(tf.concat([
+                self.perc_A, self.perc_B, self.perc_fake_B, self.perc_fake_A,self.perc_cyc_A,self.perc_cyc_B,self.perc_fake_cyc_B,self.perc_fake_cyc_A
+            ],axis=0))
             percep_norm,var = tf.nn.moments(self.perc, [1, 2], keep_dims=True)
             self.perc = tf.divide(self.perc,tf.add(percep_norm,1e-5))
 
@@ -443,8 +534,12 @@ class MakeupEmbeddingGAN():
 
     def loss_cals(self):
         cyc_loss = tf.reduce_mean(tf.abs(self.input_A-self.cyc_A))+tf.reduce_mean(tf.abs(self.input_B-self.cyc_B))
+        cyc_cascade_loss = tf.reduce_mean(tf.abs(self.cyc_A-self.cyc_cyc_A))+tf.reduce_mean(tf.abs(self.cyc_B-self.cyc_cyc_B))
+
         disc_loss_A = tf.reduce_mean(tf.squared_difference(self.fake_A_rec,1))
         disc_loss_B = tf.reduce_mean(tf.squared_difference(self.fake_B_rec,1))
+        disc_loss_cyc_A = tf.reduce_mean(tf.squared_difference(self.fake_cyc_A_rec,1))
+        disc_loss_cyc_B = tf.reduce_mean(tf.squared_difference(self.fake_cyc_B_rec,1))
 
         temp_source = tf.cast((self.fake_B[0, :, :, 0] + 1) * 127.5, dtype=tf.float32)
         temp_template = tf.cast((self.input_B[0, :, :, 0] + 1) * 127.5, dtype=tf.float32)
@@ -452,9 +547,20 @@ class MakeupEmbeddingGAN():
                                                        self.input_B_mask[0])
         histogram_loss_r_eye = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
                                                        self.input_B_mask[1])
-        histogram_loss_r_face = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
-                                                        self.input_B_mask[2])
-        histogram_loss_r = histogram_loss_r_face + histogram_loss_r_lip + histogram_loss_r_eye
+        # histogram_loss_r_face = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+        #                                                 self.input_B_mask[2])
+        histogram_loss_r = histogram_loss_r_lip + histogram_loss_r_eye
+
+        temp_source = tf.cast((self.fake_cyc_B[0, :, :, 0] + 1) * 127.5, dtype=tf.float32)
+        temp_template = tf.cast((self.cyc_B[0, :, :, 0] + 1) * 127.5, dtype=tf.float32)
+        histogram_loss_r_lip_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[0],
+                                                       self.input_B_mask[0])
+        histogram_loss_r_eye_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
+                                                       self.input_B_mask[1])
+        # histogram_loss_r_face_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+        #                                                 self.input_B_mask[2])
+        histogram_loss_r_cyc = histogram_loss_r_lip_cyc + histogram_loss_r_eye_cyc
+
 
         temp_source = tf.cast((self.fake_B[0, :, :, 1] + 1) * 127.5, dtype=tf.float32)
         temp_template = tf.cast((self.input_B[0, :, :, 1] + 1) * 127.5, dtype=tf.float32)
@@ -462,9 +568,19 @@ class MakeupEmbeddingGAN():
                                                        self.input_B_mask[0])
         histogram_loss_g_eye = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
                                                        self.input_B_mask[1])
-        histogram_loss_g_face = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
-                                                        self.input_B_mask[2])
-        histogram_loss_g = histogram_loss_g_lip + histogram_loss_g_face + histogram_loss_g_eye
+        # histogram_loss_g_face = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+        #                                                 self.input_B_mask[2])
+        histogram_loss_g = histogram_loss_g_lip + histogram_loss_g_eye
+
+        temp_source = tf.cast((self.fake_cyc_B[0, :, :, 1] + 1) * 127.5, dtype=tf.float32)
+        temp_template = tf.cast((self.cyc_B[0, :, :, 1] + 1) * 127.5, dtype=tf.float32)
+        histogram_loss_g_lip_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[0],
+                                                       self.input_B_mask[0])
+        histogram_loss_g_eye_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
+                                                       self.input_B_mask[1])
+        # histogram_loss_g_face_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+        #                                                 self.input_B_mask[2])
+        histogram_loss_g_cyc = histogram_loss_g_lip_cyc + histogram_loss_g_eye_cyc
 
         temp_source = tf.cast((self.fake_B[0, :, :, 2] + 1) * 127.5, dtype=tf.float32)
         temp_template = tf.cast((self.input_B[0, :, :, 2] + 1) * 127.5, dtype=tf.float32)
@@ -472,19 +588,33 @@ class MakeupEmbeddingGAN():
                                                        self.input_B_mask[0])
         histogram_loss_b_eye = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
                                                        self.input_B_mask[1])
-        histogram_loss_b_face = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
-                                                        self.input_B_mask[2])
-        histogram_loss_b = histogram_loss_b_lip + histogram_loss_b_face + histogram_loss_b_eye
+        # histogram_loss_b_face = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+        #                                                 self.input_B_mask[2])
+        histogram_loss_b = histogram_loss_b_lip + histogram_loss_b_eye
 
-        makeup_loss = histogram_loss_r + histogram_loss_g + histogram_loss_b
+        temp_source = tf.cast((self.fake_cyc_B[0, :, :, 2] + 1) * 127.5, dtype=tf.float32)
+        temp_template = tf.cast((self.cyc_B[0, :, :, 2] + 1) * 127.5, dtype=tf.float32)
+        histogram_loss_b_lip_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[0],
+                                                       self.input_B_mask[0])
+        histogram_loss_b_eye_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[1],
+                                                       self.input_B_mask[1])
+        # histogram_loss_b_face_cyc = self.histogram_loss_cal(temp_source, temp_template, self.input_A_mask[2],
+        #                                                 self.input_B_mask[2])
+        histogram_loss_b_cyc = histogram_loss_b_lip_cyc + histogram_loss_b_eye_cyc
+
+        makeup_loss = histogram_loss_r + histogram_loss_g + histogram_loss_b+histogram_loss_r_cyc+histogram_loss_g_cyc+histogram_loss_b_cyc
 
         perceptual_loss = tf.reduce_mean(tf.squared_difference(self.perc[0], self.perc[2])) + tf.reduce_mean(
-            tf.squared_difference(self.perc[1], self.perc[3]))
+            tf.squared_difference(self.perc[1], self.perc[3]))+tf.reduce_mean(
+            tf.squared_difference(self.perc[4], self.perc[6]))+tf.reduce_mean(
+            tf.squared_difference(self.perc[5],self.perc[7])
+        )
 
-        g_loss = cyc_loss*10+disc_loss_A+disc_loss_B+makeup_loss+perceptual_loss*0.05
+        g_loss = cyc_loss*20+cyc_cascade_loss*20+disc_loss_A+disc_loss_B+disc_loss_cyc_A+disc_loss_cyc_B+makeup_loss+perceptual_loss*0.05
 
-        d_loss_A = tf.reduce_mean(tf.squared_difference(self.rec_A,1))+tf.reduce_mean(tf.square(self.fake_pool_A_rec))
-        d_loss_B = tf.reduce_mean(tf.squared_difference(self.rec_B,1))+tf.reduce_mean(tf.square(self.fake_pool_B_rec))
+        d_loss_A = tf.reduce_mean(tf.squared_difference(self.rec_A,1))+2*tf.reduce_mean(tf.square(self.fake_pool_A_rec))+tf.reduce_mean(tf.squared_difference(self.fake_cyc_A_rec,1))
+        d_loss_B = tf.reduce_mean(tf.squared_difference(self.rec_B,1))+2*tf.reduce_mean(tf.square(self.fake_pool_B_rec))+tf.reduce_mean(tf.squared_difference(self.fake_cyc_B_rec,1))
+
 
         optimizer = tf.train.AdamOptimizer(self.lr,beta1=0.5)
         # optimizer = tfp.optimizer.StochasticGradientLangevinDynamics(learning_rate=self.lr,preconditioner_decay_rate=0.99)
@@ -505,13 +635,17 @@ class MakeupEmbeddingGAN():
 
         self.disc_A_loss_sum = tf.summary.scalar("disc_loss_A",disc_loss_A)
         self.disc_B_loss_sum = tf.summary.scalar("disc_loss_B",disc_loss_B)
+        self.disc_A_cyc_loss_sum = tf.summary.scalar("disc_loss_cyc_A", disc_loss_cyc_A)
+        self.disc_B_cyc_loss_sum = tf.summary.scalar("disc_loss_cyc_B", disc_loss_cyc_B)
         self.cyc_loss_sum = tf.summary.scalar("cyc_loss",cyc_loss)
+        self.cyc_cascade_loss_sum = tf.summary.scalar("cyc_cascade_loss",cyc_cascade_loss)
         self.makeup_loss_sum = tf.summary.scalar("makeup_loss",makeup_loss)
         self.percep_loss_sum = tf.summary.scalar("perceptual_loss",perceptual_loss)
         self.g_loss_sum = tf.summary.scalar("g_loss",g_loss)
 
         self.g_summary = tf.summary.merge([
-            self.disc_A_loss_sum,self.disc_B_loss_sum,self.cyc_loss_sum,self.makeup_loss_sum,self.percep_loss_sum,self.g_loss_sum
+            self.disc_A_loss_sum,self.disc_B_loss_sum,self.cyc_loss_sum,self.makeup_loss_sum,self.percep_loss_sum,self.g_loss_sum,
+            self.disc_A_cyc_loss_sum,self.disc_B_cyc_loss_sum,self.cyc_cascade_loss_sum,
         ],"g_summary")
 
         self.d_A_loss = tf.summary.scalar("d_loss_A",d_loss_A)
