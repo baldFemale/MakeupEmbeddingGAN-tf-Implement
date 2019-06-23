@@ -1,3 +1,6 @@
+# 使用预训练的VGG16模型
+# 这部分完全按照https://github.com/machrisaa/tensorflow-vgg的流程使用，没有任何修改
+
 import inspect
 import os
 

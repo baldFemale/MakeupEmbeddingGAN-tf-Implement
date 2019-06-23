@@ -1,3 +1,9 @@
+# Pnet和Tnet的结构基本相同，主要参照了中间包括9个resblock的cycleGAN模型，
+# 主要的不同有两点：
+# 1. Pnet没有最后一层，也就是Tnet的最后一层没有进行动态实例标准化
+# 2. Pnet每一层后都有一个全连接层，根据网络中间层参数生成对应的gammas和betas
+# Pnet生成的gammas和betas通过两个hashmap（key:hidden_layer,value:gammas/betas)传给Tnet
+
 import tensorflow as tf
 
 from layers import *
@@ -9,8 +15,9 @@ ndf = 64
 
 def Pnet(input_B,name="Pnet"):
     """
+    搭建风格预测网路Pnet
     :param input_B: 1*256*256*3
-    :param name:
+    :param name: namespace
     :return: gammas and betas
     """
     gammas = {}
@@ -64,8 +71,9 @@ def Pnet(input_B,name="Pnet"):
 
 def Tnet(input_A,gammas,betas,name="Tnet"):
     """
+    搭建风格转换网络Tnet
     :param input_A: 1*256*256*3
-    :param name:
+    :param name: namespace
     :return: 1*256*256*3
     """
     with tf.variable_scope(name,reuse=tf.AUTO_REUSE):
@@ -110,6 +118,14 @@ def Tnet(input_A,gammas,betas,name="Tnet"):
 
 
 def generate_discriminator(inputdis,name="discriminator"):
+    """
+    搭建判别器
+    在cycleGAN的patch-discriminator的基础上引入了谱归一化
+    patch的尺寸固定在70*70
+    :param inputdis:
+    :param name:
+    :return:
+    """
     with tf.variable_scope(name):
         f = 4
         o_c1 = generate_conv(inputdis,num_outputs=ndf,kernel_size=f,stride=2,padding="SAME",name="c1",
@@ -120,5 +136,6 @@ def generate_discriminator(inputdis,name="discriminator"):
                              do_spec=True, do_relu=True, relufactor=0.2)  # 1*32*32*256
         o_c4 = generate_conv(o_c3, num_outputs=ndf * 8, kernel_size=f, stride=1, padding="SAME", name="c4",
                              do_spec=True, do_relu=True, relufactor=0.2)  # 1*32*32*512
+        # o_c5是[1,32,32,1]，其中每个element对应到输入图像中都是70*70的感知野
         o_c5 = generate_conv(o_c4, num_outputs=1, kernel_size=f, stride=1, padding="SAME", name="c5")  # 1*32*32*1
         return o_c5
